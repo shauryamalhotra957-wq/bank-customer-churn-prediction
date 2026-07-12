@@ -4,6 +4,15 @@ Machine learning project for predicting whether a bank customer will stay with t
 
 ![Bank churn prediction pipeline](docs/readme-preview.svg)
 
+## Project Snapshot
+
+| Area | Detail |
+| --- | --- |
+| Experience | End-to-end churn modeling pipeline |
+| Core system | Feature engineering, model comparison, metrics, saved artifacts, single-customer prediction |
+| Design signal | Pipeline preview plus business-readable problem, metrics, and outputs |
+| Quality signal | Requirements file, reproducible script, deployment and fairness limitations |
+
 ## Problem
 
 Customer churn is expensive. This project predicts the `Exited` target:
