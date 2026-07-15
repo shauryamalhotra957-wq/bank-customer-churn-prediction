@@ -152,3 +152,7 @@ bank-customer-churn-prediction/
 - This is a learning and portfolio project, not a production credit-risk or banking decision system.
 - Real banking deployment would require fairness review, explainability, monitoring, privacy controls, and compliance review.
 
+## User Experience
+
+The training script reports a four-stage progress flow, presents a compact decision summary, labels every generated artifact, and ends with the human-review step that matters most. See the [model workflow experience guide](docs/USER_EXPERIENCE.md) for output semantics, error recovery, and accessible reporting guidance.
+

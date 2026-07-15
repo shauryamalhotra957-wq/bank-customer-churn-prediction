@@ -270,6 +270,7 @@ def add_features_for_prediction(df):
     return df
 
 def train():
+    print("[1/4] Discovering and validating the churn dataset...")
     df, selected_csv = load_data()
     X, y, data, drop_cols = make_features(df)
 
@@ -282,7 +283,9 @@ def train():
     rows = []
     trained = {}
 
-    for name, model in models.items():
+    print(f"[2/4] Comparing {len(models)} candidate models...")
+    for index, (name, model) in enumerate(models.items(), start=1):
+        print(f"      {index}/{len(models)}  {name}")
         pipe = Pipeline([
             ("preprocess", clone(preprocessor)),
             ("model", model)
@@ -322,6 +325,7 @@ def train():
     best_name = leaderboard.loc[0, "model"]
     best = trained[best_name]
 
+    print(f"[3/4] Refitting the selected model: {best_name}")
     final_pipeline = Pipeline([
         ("preprocess", clone(preprocessor)),
         ("model", clone(models[best_name]))
@@ -360,8 +364,9 @@ def train():
     test_output["Predicted_Status"] = np.where(test_output["Predicted_Exited"] == 1, "LEFT_BANK_CHURNED", "CONTINUED_BANK")
     test_output.to_csv("outputs/test_predictions.csv", index=False)
 
+    print("[4/4] Training complete. Review the decision summary below.")
     print("=" * 80)
-    print("BANK CUSTOMER CHURN MODEL")
+    print("BANK CUSTOMER CHURN MODEL  |  DECISION SUMMARY")
     print("=" * 80)
     print("Dataset:", selected_csv)
     print("Best model:", best_name)
@@ -378,10 +383,11 @@ def train():
     print(pd.DataFrame(final_cm, index=["Actual Continued", "Actual Churned"], columns=["Predicted Continued", "Predicted Churned"]))
     print("\nClassification report:")
     print(classification_report(y_test, final_preds, target_names=["CONTINUED_BANK", "LEFT_BANK_CHURNED"], zero_division=0))
-    print("\nSaved:")
-    print("outputs/bank_churn_model.joblib")
-    print("outputs/model_leaderboard.csv")
-    print("outputs/test_predictions.csv")
+    print("\nArtifacts:")
+    print("  MODEL        outputs/bank_churn_model.joblib")
+    print("  LEADERBOARD  outputs/model_leaderboard.csv")
+    print("  PREDICTIONS  outputs/test_predictions.csv")
+    print("\nNext step: inspect false negatives before using scores in a retention workflow.")
 
     return package, leaderboard
 
@@ -428,5 +434,6 @@ if __name__ == "__main__":
         "EstimatedSalary": 90000.0
     }
 
+    sample_prediction = predict_customer(sample)
     print("\nSample prediction:")
-    print(predict_customer(sample))
+    print(sample_prediction[["Churn_Probability", "Continue_Probability", "Predicted_Status"]].to_string(index=False))
