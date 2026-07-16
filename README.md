@@ -53,7 +53,7 @@ The training script adds:
 - `AgeGroup`
 - `CreditScoreGroup`
 
-It also handles missing values, categorical encoding, scaling, duplicate removal, and train/test splitting.
+It also handles missing values, categorical encoding, scaling, duplicate removal, and separate training, validation, and held-out test splits. Candidate models and decision thresholds are selected on validation data; the test split is used once for final evaluation.
 
 ## Models Compared
 
@@ -114,6 +114,8 @@ outputs/
   model_leaderboard.csv
   test_predictions.csv
 ```
+
+`model_leaderboard.csv` contains validation metrics used for model selection. `test_predictions.csv` contains the final selected model's held-out test results.
 
 ## Predict One Customer
 

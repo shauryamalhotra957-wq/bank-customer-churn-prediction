@@ -250,6 +250,53 @@ def build_models(y_train):
 
     return models
 
+def compare_candidate_models(models, preprocessor, X_train, y_train, X_valid, y_valid):
+    """Rank model families using validation data only."""
+    if not models:
+        raise ValueError("At least one candidate model is required")
+
+    rows = []
+    thresholds = {}
+
+    print(f"[2/4] Comparing {len(models)} candidate models...")
+    for index, (name, model) in enumerate(models.items(), start=1):
+        print(f"      {index}/{len(models)}  {name}")
+        pipe = Pipeline([
+            ("preprocess", clone(preprocessor)),
+            ("model", clone(model))
+        ])
+
+        pipe.fit(X_train, y_train)
+        valid_probs = pipe.predict_proba(X_valid)[:, 1]
+        threshold = best_threshold(y_valid, valid_probs)
+        metrics = evaluate(y_valid, valid_probs, threshold)
+        thresholds[name] = threshold
+
+        rows.append({
+            "model": name,
+            "threshold": threshold,
+            "validation_accuracy": metrics["accuracy"],
+            "validation_precision": metrics["precision"],
+            "validation_recall": metrics["recall"],
+            "validation_f1": metrics["f1"],
+            "validation_roc_auc": metrics["roc_auc"],
+            "validation_average_precision": metrics["average_precision"],
+            "validation_dice_continued": metrics["dice_continued"],
+            "validation_dice_churned": metrics["dice_churned"],
+            "validation_average_dice": metrics["average_dice"]
+        })
+
+    leaderboard = pd.DataFrame(rows).sort_values(
+        [
+            "validation_roc_auc",
+            "validation_f1",
+            "validation_average_dice",
+            "validation_accuracy"
+        ],
+        ascending=False
+    ).reset_index(drop=True)
+    return leaderboard, thresholds
+
 def add_features_for_prediction(df):
     df = df.copy()
 
@@ -279,51 +326,16 @@ def train():
 
     preprocessor, numeric, categorical = preprocessor_for(X_train)
     models = build_models(y_train)
-
-    rows = []
-    trained = {}
-
-    print(f"[2/4] Comparing {len(models)} candidate models...")
-    for index, (name, model) in enumerate(models.items(), start=1):
-        print(f"      {index}/{len(models)}  {name}")
-        pipe = Pipeline([
-            ("preprocess", clone(preprocessor)),
-            ("model", model)
-        ])
-
-        pipe.fit(X_train, y_train)
-
-        valid_probs = pipe.predict_proba(X_valid)[:, 1]
-        threshold = best_threshold(y_valid, valid_probs)
-
-        test_probs = pipe.predict_proba(X_test)[:, 1]
-        metrics = evaluate(y_test, test_probs, threshold)
-
-        rows.append({
-            "model": name,
-            "threshold": threshold,
-            "accuracy": metrics["accuracy"],
-            "precision": metrics["precision"],
-            "recall": metrics["recall"],
-            "f1": metrics["f1"],
-            "roc_auc": metrics["roc_auc"],
-            "average_precision": metrics["average_precision"],
-            "dice_continued": metrics["dice_continued"],
-            "dice_churned": metrics["dice_churned"],
-            "average_dice": metrics["average_dice"]
-        })
-
-        trained[name] = {
-            "pipeline": pipe,
-            "threshold": threshold,
-            "probs": test_probs,
-            "preds": metrics["predictions"],
-            "metrics": metrics
-        }
-
-    leaderboard = pd.DataFrame(rows).sort_values(["roc_auc", "f1", "average_dice", "accuracy"], ascending=False).reset_index(drop=True)
+    leaderboard, thresholds = compare_candidate_models(
+        models,
+        preprocessor,
+        X_train,
+        y_train,
+        X_valid,
+        y_valid
+    )
     best_name = leaderboard.loc[0, "model"]
-    best = trained[best_name]
+    selected_threshold = thresholds[best_name]
 
     print(f"[3/4] Refitting the selected model: {best_name}")
     final_pipeline = Pipeline([
@@ -334,14 +346,18 @@ def train():
     final_pipeline.fit(X_train_full, y_train_full)
 
     final_probs = final_pipeline.predict_proba(X_test)[:, 1]
-    final_preds = (final_probs >= best["threshold"]).astype(int)
-    final_cm = confusion_matrix(y_test, final_preds, labels=[0, 1])
-    d0, d1, avg_dice = dice_from_cm(final_cm)
+    final_metrics = evaluate(y_test, final_probs, selected_threshold)
+    final_preds = final_metrics["predictions"]
+    final_cm = final_metrics["confusion_matrix"]
+    d0 = final_metrics["dice_continued"]
+    d1 = final_metrics["dice_churned"]
+    avg_dice = final_metrics["average_dice"]
 
     package = {
         "pipeline": final_pipeline,
-        "threshold": float(best["threshold"]),
+        "threshold": float(selected_threshold),
         "model_name": best_name,
+        "selection_split": "validation",
         "feature_columns": list(X.columns),
         "target_column": TARGET,
         "target_meaning": {"0": "CONTINUED_BANK", "1": "LEFT_BANK_CHURNED"},
@@ -370,12 +386,12 @@ def train():
     print("=" * 80)
     print("Dataset:", selected_csv)
     print("Best model:", best_name)
-    print("Threshold:", round(best["threshold"], 3))
-    print("Accuracy:", round(accuracy_score(y_test, final_preds), 4))
-    print("Precision:", round(precision_score(y_test, final_preds, zero_division=0), 4))
-    print("Recall:", round(recall_score(y_test, final_preds, zero_division=0), 4))
-    print("F1:", round(f1_score(y_test, final_preds, zero_division=0), 4))
-    print("ROC-AUC:", round(roc_auc_score(y_test, final_probs), 4))
+    print("Threshold:", round(selected_threshold, 3))
+    print("Accuracy:", round(final_metrics["accuracy"], 4))
+    print("Precision:", round(final_metrics["precision"], 4))
+    print("Recall:", round(final_metrics["recall"], 4))
+    print("F1:", round(final_metrics["f1"], 4))
+    print("ROC-AUC:", round(final_metrics["roc_auc"], 4))
     print("Dice continued:", round(d0, 4))
     print("Dice churned:", round(d1, 4))
     print("Average dice:", round(avg_dice, 4))
