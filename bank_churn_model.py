@@ -93,7 +93,16 @@ def make_features(df):
         raise ValueError(f"Missing required columns: {missing}")
 
     data = data.drop_duplicates().reset_index(drop=True)
-    data[TARGET] = data[TARGET].astype(int)
+    target = pd.to_numeric(data[TARGET], errors="coerce")
+    if target.isna().any():
+        raise ValueError(f"{TARGET} must contain only binary values 0 and 1")
+    target_values = set(target.unique())
+    if target_values != {0, 1}:
+        found = ", ".join(str(value) for value in sorted(target_values)) or "none"
+        raise ValueError(
+            f"{TARGET} must contain both binary classes 0 and 1; found: {found}"
+        )
+    data[TARGET] = target.astype(int)
 
     data["BalanceSalaryRatio"] = data["Balance"] / data["EstimatedSalary"].replace(0, np.nan)
     data["BalanceSalaryRatio"] = data["BalanceSalaryRatio"].replace([np.inf, -np.inf], np.nan)
