@@ -1,15 +1,12 @@
-import os
+import argparse
 import glob
-import json
+import os
 import warnings
-import subprocess
-import sys
 
 warnings.filterwarnings("ignore")
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import joblib
 
 from sklearn.base import clone
@@ -17,7 +14,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import GradientBoostingClassifier, HistGradientBoostingClassifier, RandomForestClassifier, ExtraTreesClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, average_precision_score, classification_report, confusion_matrix, f1_score, precision_score, recall_score, roc_auc_score, roc_curve
+from sklearn.metrics import accuracy_score, average_precision_score, classification_report, confusion_matrix, f1_score, precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -35,9 +32,11 @@ def find_csvs():
 def download_fallback():
     try:
         import kagglehub
-    except Exception:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "kagglehub"])
-        import kagglehub
+    except ImportError as error:
+        raise RuntimeError(
+            "kagglehub is required for automatic dataset download. "
+            "Install requirements.txt or pass a local dataset with --data."
+        ) from error
 
     csvs = []
     for dataset in ["shrutimechlearn/churn-modelling", "shantanudhakadd/bank-customer-churn-prediction"]:
@@ -72,11 +71,22 @@ def select_csv(csvs):
 
     return best
 
-def load_data():
-    csvs = find_csvs()
+def load_data(csv_path=None, allow_download=True):
+    if csv_path:
+        selected = os.path.abspath(os.path.expanduser(csv_path))
+        if not os.path.isfile(selected):
+            raise FileNotFoundError(f"Dataset not found: {selected}")
+        csvs = [selected]
+    else:
+        csvs = find_csvs()
+
+    if not csvs and allow_download:
+        csvs = download_fallback()
 
     if not csvs:
-        csvs = download_fallback()
+        raise FileNotFoundError(
+            "No churn dataset found. Pass one explicitly with --data or remove --no-download."
+        )
 
     selected = select_csv(csvs)
     df = pd.read_csv(selected)
@@ -269,9 +279,9 @@ def add_features_for_prediction(df):
 
     return df
 
-def train():
+def train(data_path=None, output_dir="outputs", allow_download=True):
     print("[1/4] Discovering and validating the churn dataset...")
-    df, selected_csv = load_data()
+    df, selected_csv = load_data(data_path, allow_download=allow_download)
     X, y, data, drop_cols = make_features(df)
 
     X_train_full, X_test, y_train_full, y_test = train_test_split(X, y, test_size=0.20, random_state=SEED, stratify=y)
@@ -350,10 +360,14 @@ def train():
         "categorical_features": categorical
     }
 
-    os.makedirs("outputs", exist_ok=True)
+    output_dir = os.path.abspath(os.path.expanduser(output_dir))
+    os.makedirs(output_dir, exist_ok=True)
+    model_path = os.path.join(output_dir, "bank_churn_model.joblib")
+    leaderboard_path = os.path.join(output_dir, "model_leaderboard.csv")
+    predictions_path = os.path.join(output_dir, "test_predictions.csv")
 
-    joblib.dump(package, "outputs/bank_churn_model.joblib")
-    leaderboard.to_csv("outputs/model_leaderboard.csv", index=False)
+    joblib.dump(package, model_path)
+    leaderboard.to_csv(leaderboard_path, index=False)
 
     test_output = X_test.copy()
     test_output["Actual_Exited"] = y_test.values
@@ -362,7 +376,7 @@ def train():
     test_output["Continue_Probability"] = 1 - final_probs
     test_output["Predicted_Exited"] = final_preds
     test_output["Predicted_Status"] = np.where(test_output["Predicted_Exited"] == 1, "LEFT_BANK_CHURNED", "CONTINUED_BANK")
-    test_output.to_csv("outputs/test_predictions.csv", index=False)
+    test_output.to_csv(predictions_path, index=False)
 
     print("[4/4] Training complete. Review the decision summary below.")
     print("=" * 80)
@@ -384,9 +398,9 @@ def train():
     print("\nClassification report:")
     print(classification_report(y_test, final_preds, target_names=["CONTINUED_BANK", "LEFT_BANK_CHURNED"], zero_division=0))
     print("\nArtifacts:")
-    print("  MODEL        outputs/bank_churn_model.joblib")
-    print("  LEADERBOARD  outputs/model_leaderboard.csv")
-    print("  PREDICTIONS  outputs/test_predictions.csv")
+    print("  MODEL       ", model_path)
+    print("  LEADERBOARD ", leaderboard_path)
+    print("  PREDICTIONS ", predictions_path)
     print("\nNext step: inspect false negatives before using scores in a retention workflow.")
 
     return package, leaderboard
@@ -418,8 +432,34 @@ def predict_customer(customer, model_path="outputs/bank_churn_model.joblib"):
 
     return output
 
+def build_parser():
+    parser = argparse.ArgumentParser(
+        description="Train and compare bank customer churn classifiers."
+    )
+    parser.add_argument(
+        "--data",
+        help="Path to Churn_Modelling.csv. When omitted, local files are discovered first.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="outputs",
+        help="Directory for the model, leaderboard, and predictions (default: outputs).",
+    )
+    parser.add_argument(
+        "--no-download",
+        action="store_true",
+        help="Fail instead of downloading a fallback dataset when no local CSV is found.",
+    )
+    return parser
+
+
 if __name__ == "__main__":
-    train()
+    args = build_parser().parse_args()
+    train(
+        data_path=args.data,
+        output_dir=args.output_dir,
+        allow_download=not args.no_download,
+    )
 
     sample = {
         "CreditScore": 650,
@@ -434,6 +474,12 @@ if __name__ == "__main__":
         "EstimatedSalary": 90000.0
     }
 
-    sample_prediction = predict_customer(sample)
+    sample_prediction = predict_customer(
+        sample,
+        model_path=os.path.join(
+            os.path.abspath(os.path.expanduser(args.output_dir)),
+            "bank_churn_model.joblib",
+        ),
+    )
     print("\nSample prediction:")
     print(sample_prediction[["Churn_Probability", "Continue_Probability", "Predicted_Status"]].to_string(index=False))

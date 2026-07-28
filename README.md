@@ -93,7 +93,28 @@ pip install -r requirements.txt
 Put `Churn_Modelling.csv` in the project folder, then run:
 
 ```bash
-python bank_churn_model.py
+python bank_churn_model.py --data Churn_Modelling.csv
+```
+
+Use `--output-dir` to keep generated artifacts outside the repository, and
+`--no-download` in CI or other network-restricted environments:
+
+```bash
+python bank_churn_model.py \
+  --data ./data/Churn_Modelling.csv \
+  --output-dir ./artifacts \
+  --no-download
+```
+
+Run `python bank_churn_model.py --help` for the complete CLI reference. The
+script never installs packages at runtime; dependency setup stays explicit and
+reproducible.
+
+XGBoost and LightGBM are optional candidate models. Install both when you want
+the wider comparison:
+
+```bash
+pip install -r requirements-optional.txt
 ```
 
 ## Run On Kaggle
@@ -142,6 +163,9 @@ print(predict_customer(customer))
 bank-customer-churn-prediction/
   bank_churn_model.py
   requirements.txt
+  requirements-optional.txt
+  tests/
+    test_bank_churn_model.py
   README.md
   docs/
     readme-preview.svg

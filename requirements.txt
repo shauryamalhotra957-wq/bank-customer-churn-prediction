@@ -1,8 +1,5 @@
 numpy
 pandas
-matplotlib
 scikit-learn
 joblib
 kagglehub
-xgboost
-lightgbm
