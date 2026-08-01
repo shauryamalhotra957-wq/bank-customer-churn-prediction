@@ -2,8 +2,6 @@ import os
 import glob
 import json
 import warnings
-import subprocess
-import sys
 
 warnings.filterwarnings("ignore")
 
@@ -35,9 +33,11 @@ def find_csvs():
 def download_fallback():
     try:
         import kagglehub
-    except Exception:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "kagglehub"])
-        import kagglehub
+    except ImportError as exc:
+        raise RuntimeError(
+            "kagglehub is required for automatic dataset downloads. "
+            "Install project dependencies with `pip install -r requirements.txt`."
+        ) from exc
 
     csvs = []
     for dataset in ["shrutimechlearn/churn-modelling", "shantanudhakadd/bank-customer-churn-prediction"]:
