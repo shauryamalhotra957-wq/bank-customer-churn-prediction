@@ -11,7 +11,7 @@ Machine learning project for predicting whether a bank customer will stay with t
 | Experience | End-to-end churn modeling pipeline |
 | Core system | Feature engineering, model comparison, metrics, saved artifacts, single-customer prediction |
 | Design signal | Pipeline preview plus business-readable problem, metrics, and outputs |
-| Quality signal | Requirements file, reproducible script, deployment and fairness limitations |
+| Quality signal | Held-out test evaluation, unit-test CI, reproducible script, deployment and fairness limitations |
 
 ## Problem
 
@@ -53,23 +53,39 @@ The training script adds:
 - `AgeGroup`
 - `CreditScoreGroup`
 
-It also handles missing values, categorical encoding, scaling, duplicate removal, and train/test splitting.
+It also handles missing values, categorical encoding, scaling, duplicate removal, and stratified train/validation/test splitting.
+
+## Evaluation Design
+
+The pipeline keeps the test split isolated until the end:
+
+1. Split the data into training and held-out test sets.
+2. Split the training portion again into train and validation sets.
+3. Fit each candidate on the train split.
+4. Tune its classification threshold and compare models using validation metrics only.
+5. Refit the selected model on the full non-test training data.
+6. Evaluate exactly once on the untouched test split.
+
+This avoids using test-set performance to choose the model, which would make the final score optimistically biased.
 
 ## Models Compared
+
+Core models:
 
 - Logistic Regression
 - Random Forest
 - Extra Trees
 - Gradient Boosting
 - HistGradientBoosting
-- XGBoost, if installed
-- LightGBM, if installed
 
-The script evaluates models and selects the best performer using ROC-AUC, F1 score, average Dice score, and accuracy.
+Optional models, used automatically when installed:
+
+- XGBoost
+- LightGBM
 
 ## Metrics
 
-The script prints:
+The validation leaderboard and final held-out test summary include:
 
 - Accuracy
 - Precision
@@ -84,10 +100,16 @@ The script prints:
 
 ## Quick Start
 
-Install dependencies:
+Install the core dependencies:
 
 ```bash
 pip install -r requirements.txt
+```
+
+To include XGBoost and LightGBM as extra candidates:
+
+```bash
+pip install -r requirements-optional.txt
 ```
 
 Put `Churn_Modelling.csv` in the project folder, then run:
@@ -95,6 +117,14 @@ Put `Churn_Modelling.csv` in the project folder, then run:
 ```bash
 python bank_churn_model.py
 ```
+
+## Run Tests
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+GitHub Actions runs the same unit-test suite for pushes and pull requests.
 
 ## Run On Kaggle
 
@@ -114,6 +144,8 @@ outputs/
   model_leaderboard.csv
   test_predictions.csv
 ```
+
+`model_leaderboard.csv` contains **validation** metrics used for model selection. The console summary and `test_predictions.csv` come from the final untouched test split.
 
 ## Predict One Customer
 
@@ -142,6 +174,12 @@ print(predict_customer(customer))
 bank-customer-churn-prediction/
   bank_churn_model.py
   requirements.txt
+  requirements-optional.txt
+  tests/
+    test_bank_churn_model.py
+  .github/
+    workflows/
+      tests.yml
   README.md
   docs/
     readme-preview.svg
@@ -155,4 +193,3 @@ bank-customer-churn-prediction/
 ## User Experience
 
 The training script reports a four-stage progress flow, presents a compact decision summary, labels every generated artifact, and ends with the human-review step that matters most. See the [model workflow experience guide](docs/USER_EXPERIENCE.md) for output semantics, error recovery, and accessible reporting guidance.
-
