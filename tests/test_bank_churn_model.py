@@ -1,11 +1,12 @@
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from bank_churn_model import best_threshold, dice_from_cm, make_features, select_csv
+from bank_churn_model import best_threshold, dice_from_cm, make_features, predict_customer, select_csv
 
 
 class ChurnModelUnitTests(unittest.TestCase):
@@ -56,6 +57,11 @@ class ChurnModelUnitTests(unittest.TestCase):
         self.assertTrue(pd.isna(X.loc[0, "BalanceSalaryRatio"]))
         self.assertTrue(pd.isna(X.loc[0, "AgeTenureRatio"]))
         self.assertTrue(pd.isna(X.loc[0, "BalancePerProduct"]))
+
+    def test_predict_customer_reports_missing_required_columns(self):
+        with patch("bank_churn_model.joblib.load", return_value={}):
+            with self.assertRaisesRegex(ValueError, "Missing required prediction columns"):
+                predict_customer({"Age": 42})
 
     def test_select_csv_prefers_expected_schema(self):
         with tempfile.TemporaryDirectory() as tmp:
