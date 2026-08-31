@@ -565,6 +565,22 @@ def predict_customer(customer, model_path="outputs/bank_churn_model.joblib"):
     else:
         customer_df = customer.copy()
 
+    required_prediction_columns = [
+        "CreditScore",
+        "Geography",
+        "Gender",
+        "Age",
+        "Tenure",
+        "Balance",
+        "NumOfProducts",
+        "HasCrCard",
+        "IsActiveMember",
+        "EstimatedSalary",
+    ]
+    missing = [column for column in required_prediction_columns if column not in customer_df.columns]
+    if missing:
+        raise ValueError(f"Missing required prediction columns: {missing}")
+
     customer_df = add_features_for_prediction(customer_df)
 
     for col in package["feature_columns"]:
