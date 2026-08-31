@@ -139,7 +139,13 @@ def make_features(df):
         raise ValueError(f"Missing required columns: {missing}")
 
     data = data.drop_duplicates().reset_index(drop=True)
+    if data.empty:
+        raise ValueError("Dataset has no rows after duplicate removal")
+
     data[TARGET] = data[TARGET].astype(int)
+    invalid_targets = sorted(set(data[TARGET].unique()) - {0, 1})
+    if invalid_targets:
+        raise ValueError(f"{TARGET} must contain only 0 or 1; found {invalid_targets}")
 
     data["BalanceSalaryRatio"] = data["Balance"] / data["EstimatedSalary"].replace(
         0, np.nan
