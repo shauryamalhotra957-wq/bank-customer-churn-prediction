@@ -91,3 +91,29 @@ class ChurnModelUnitTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+def _minimal_row(target):
+    return {
+        "CreditScore": 650,
+        "Geography": "Spain",
+        "Gender": "Male",
+        "Age": 42,
+        "Tenure": 6,
+        "Balance": 80000.0,
+        "NumOfProducts": 2,
+        "HasCrCard": 1,
+        "IsActiveMember": 1,
+        "EstimatedSalary": 90000.0,
+        "Exited": target,
+    }
+
+
+def test_make_features_rejects_non_binary_targets():
+    with unittest.TestCase().assertRaisesRegex(ValueError, "only 0 or 1"):
+        make_features(pd.DataFrame([_minimal_row(2)]))
+
+
+def test_make_features_rejects_empty_deduplicated_dataset():
+    columns = list(_minimal_row(0))
+    with unittest.TestCase().assertRaisesRegex(ValueError, "no rows"):
+        make_features(pd.DataFrame(columns=columns))
