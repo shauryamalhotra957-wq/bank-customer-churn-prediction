@@ -1,5 +1,8 @@
 # Bank Customer Churn Prediction
 
+[![CI](https://github.com/shauryamalhotra957-wq/bank-customer-churn-prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/shauryamalhotra957-wq/bank-customer-churn-prediction/actions) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+
 Machine learning project for predicting whether a bank customer will stay with the bank or churn. The pipeline loads the classic `Churn_Modelling.csv` dataset, engineers useful customer features, trains multiple classifiers, compares them with business-relevant metrics, and saves the best model.
 
 ![Bank churn prediction pipeline](docs/readme-preview.svg)
