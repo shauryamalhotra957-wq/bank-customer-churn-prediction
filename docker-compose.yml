@@ -1,0 +1,9 @@
+version: '3.8'
+services:
+  bank-customer-churn-prediction:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - ENV=production
+    command: python tests/benchmark_model_inference.py
